@@ -123,6 +123,7 @@
       width: 44px; height: 44px; flex: none; display: inline-grid; place-items: center;
       border: 0; border-radius: 999px; background: transparent; cursor: pointer;
     }
+    .icon-btn[hidden] { display: none; }
     .icon-btn:hover:not(:disabled) { background: var(--surface-2); }
     .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
     .icon-btn[aria-expanded="true"] { background: var(--accent); color: #fff; }
@@ -224,7 +225,7 @@
     <button class="icon-btn" id="fullscreenBtn" aria-label="Toggle full screen" title="Full screen (F)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
     </button>
-    <button class="icon-btn" id="settingsBtn" aria-label="Settings" aria-controls="drawer" aria-expanded="false" title="Settings (S)">
+    <button class="icon-btn" id="settingsBtn" hidden aria-label="Settings" aria-controls="drawer" aria-expanded="false" title="Settings (S)">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
     </button>
   </nav>

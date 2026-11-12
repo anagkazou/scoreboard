@@ -40,7 +40,7 @@
     .team {
       background: linear-gradient(160deg, color-mix(in srgb, var(--team) 92%, white), var(--team) 50%, color-mix(in srgb, var(--team) 86%, black));
       color: var(--ink); border-radius: var(--radius); padding: 20px;
-      display: flex; flex-direction: column; gap: 14px;
+      display: flex; flex-direction: column; gap: 14px; container-type: inline-size;
       box-shadow: 0 12px 32px rgb(0 0 0 / 0.28);
       transition: opacity 0.3s, outline-color 0.3s;
       outline: 4px solid transparent; outline-offset: 4px;
@@ -54,14 +54,14 @@
       letter-spacing: 0.08em; text-transform: uppercase;
       background: color-mix(in srgb, var(--ink) 20%, transparent);
     }
-    .score { font-size: clamp(4.5rem, 13vw, 10rem); font-weight: 900; line-height: 0.95; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+    .score { font-size: clamp(3.5rem, min(32cqi, 22vh), 16rem); font-weight: 900; line-height: 0.95; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
     .score.bump { animation: bump 0.45s ease; }
     @keyframes bump { 40% { transform: scale(1.12); } }
     .progress { height: 10px; border-radius: 99px; background: color-mix(in srgb, var(--ink) 22%, transparent); overflow: hidden; }
     .progress > span { display: block; height: 100%; background: var(--ink); border-radius: inherit; transition: width 0.4s ease; }
     .to-go { margin: -6px 0 0; font-size: 0.95rem; font-weight: 600; opacity: 0.85; }
 
-    .points { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); margin-top: auto; }
+    .points { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); margin-top: auto; }
     .pt { display: flex; border-radius: 14px; background: #ffffff; color: #151821; box-shadow: 0 4px 0 rgb(0 0 0 / 0.28); }
     .pt button { border: 0; background: none; cursor: pointer; color: inherit; }
     .pt-add { position: relative; flex: 1; min-width: 0; min-height: 72px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; text-align: left; border-radius: 14px 0 0 14px; }
@@ -74,7 +74,7 @@
     }
     .pt-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
     .pt-value { font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-    .pt-label { font-size: 0.85rem; color: #4a5263; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pt-label { font-size: 0.85rem; color: #4a5263; overflow-wrap: anywhere; }
     .pt-count {
       position: absolute; right: -8px; bottom: -6px; min-width: 22px; height: 22px; padding: 0 6px;
       display: grid; place-items: center; border-radius: 99px; background: #151821; color: #fff;
@@ -180,6 +180,21 @@
     @media (max-width: 480px) {
       .field-pair { grid-template-columns: 1fr; }
       .team { padding: 16px; }
+    }
+    @media (pointer: coarse), (max-width: 600px) {
+      header { order: -2; }
+      .dock { order: -1; position: static; transform: none; align-self: center; margin-top: 12px; }
+      body.idle .dock { opacity: 1; transform: none; pointer-events: auto; }
+      main { padding-bottom: 24px; }
+    }
+    @media (max-height: 500px) {
+      header { padding-top: 10px; }
+      .team { padding: 14px; gap: 10px; }
+      .dock { order: 0; margin: 0 auto 12px; }
+    }
+    @media (min-width: 900px) and (min-height: 600px) {
+      .board { flex: 1; grid-auto-rows: 1fr; }
+      .score { flex: 1 0 auto; display: flex; align-items: center; font-size: clamp(3.5rem, min(40cqi, 36vh), 22rem); }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; }

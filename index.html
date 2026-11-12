@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scoreboard</title>
+  <style>
+    :root {
+      --bg: #0f1115; --surface: #181b22; --surface-2: #222632; --text: #f2f4f8; --muted: #a3abbd;
+      --border: #333849; --accent: #6b97ff; --danger: #ff6b6f; --radius: 18px;
+      color-scheme: dark;
+    }
+    :root[data-theme="light"] {
+      --bg: #eef1f6; --surface: #ffffff; --surface-2: #f3f5f9; --text: #151821; --muted: #545c6e;
+      --border: #cfd5e1; --accent: #2f62e0; --danger: #c62f35;
+      color-scheme: light;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; min-height: 100vh;
+    }
+    button, input, select { font: inherit; color: inherit; }
+    button { touch-action: manipulation; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+    header { text-align: center; padding: 28px 16px 4px; }
+    header[hidden] { display: none; }
+    h1 { margin: 0; font-size: clamp(1.6rem, 4.5vw, 3.2rem); font-weight: 800; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+    .subtitle { margin: 6px 0 0; color: var(--muted); font-size: clamp(0.95rem, 1.8vw, 1.25rem); }
+    .subtitle:empty { display: none; }
+
+    main { flex: 1; width: 100%; max-width: 1600px; margin: 0 auto; padding: 16px 16px 96px; display: flex; flex-direction: column; gap: 16px; }
+    .board { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+
+    .team {
+      background: linear-gradient(160deg, color-mix(in srgb, var(--team) 92%, white), var(--team) 50%, color-mix(in srgb, var(--team) 86%, black));
+      color: var(--ink); border-radius: var(--radius); padding: 20px;
+      display: flex; flex-direction: column; gap: 14px;
+      box-shadow: 0 12px 32px rgb(0 0 0 / 0.28);
+      transition: opacity 0.3s, outline-color 0.3s;
+      outline: 4px solid transparent; outline-offset: 4px;
+    }
+    .team.win { outline-color: var(--text); }
+    .team.dim { opacity: 0.7; filter: saturate(0.55); }
+    .team-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 2rem; }
+    .team-name { margin: 0; font-size: clamp(1.3rem, 2.6vw, 2.1rem); font-weight: 800; overflow-wrap: anywhere; }
+    .chip {
+      flex: none; padding: 4px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 800;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      background: color-mix(in srgb, var(--ink) 20%, transparent);
+    }
+    .score { font-size: clamp(4.5rem, 13vw, 10rem); font-weight: 900; line-height: 0.95; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+    .score.bump { animation: bump 0.45s ease; }
+    @keyframes bump { 40% { transform: scale(1.12); } }
+    .progress { height: 10px; border-radius: 99px; background: color-mix(in srgb, var(--ink) 22%, transparent); overflow: hidden; }
+    .progress > span { display: block; height: 100%; background: var(--ink); border-radius: inherit; transition: width 0.4s ease; }
+    .to-go { margin: -6px 0 0; font-size: 0.95rem; font-weight: 600; opacity: 0.85; }
+
+    .points { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); margin-top: auto; }
+    .pt { display: flex; border-radius: 14px; background: #ffffff; color: #151821; box-shadow: 0 4px 0 rgb(0 0 0 / 0.28); }
+    .pt button { border: 0; background: none; cursor: pointer; color: inherit; }
+    .pt-add { position: relative; flex: 1; min-width: 0; min-height: 72px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; text-align: left; border-radius: 14px 0 0 14px; }
+    .pt-add:hover:not(:disabled) { background: #f2f4f8; }
+    .pt-add:active:not(:disabled) { transform: translateY(2px); }
+    .swatch {
+      position: relative; flex: none; width: 40px; height: 40px; border-radius: 50%;
+      background: radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--pt) 55%, white) 0 10%, var(--pt) 42%, color-mix(in srgb, var(--pt) 75%, black));
+      box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.22), 0 2px 4px rgb(0 0 0 / 0.2);
+    }
+    .pt-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+    .pt-value { font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .pt-label { font-size: 0.85rem; color: #4a5263; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pt-count {
+      position: absolute; right: -8px; bottom: -6px; min-width: 22px; height: 22px; padding: 0 6px;
+      display: grid; place-items: center; border-radius: 99px; background: #151821; color: #fff;
+      font-size: 0.75rem; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px #fff;
+    }
+    .pt-sub { flex: none; width: 46px; border-left: 1px solid #e1e5ec !important; border-radius: 0 14px 14px 0; font-size: 1.5rem; font-weight: 700; color: #4a5263 !important; }
+    .pt-sub:hover:not(:disabled) { background: #f2f4f8; }
+    .pt button:disabled { cursor: not-allowed; opacity: 0.4; }
+    .float {
+      position: absolute; left: 50%; bottom: 100%; pointer-events: none; font-weight: 900; font-size: 1.6rem;
+      color: var(--ink); text-shadow: 0 2px 6px rgb(0 0 0 / 0.25); animation: float 0.8s ease-out forwards;
+    }
+    @keyframes float { from { opacity: 1; transform: translate(-50%, 6px) scale(0.9); } to { opacity: 0; transform: translate(-50%, -34px) scale(1.15); } }
+
+    .result {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
+      padding: 18px 22px; border-radius: var(--radius);
+      background: var(--res, var(--surface-2)); color: var(--res-ink, var(--text));
+      box-shadow: 0 10px 28px rgb(0 0 0 / 0.25); animation: pop 0.45s ease;
+    }
+    .result[hidden] { display: none; }
+    .result h2 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.6rem); font-weight: 900; }
+    .result p { margin: 4px 0 0; opacity: 0.85; }
+    @keyframes pop { from { opacity: 0; transform: scale(0.96); } }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 44px; padding: 10px 16px; border-radius: 12px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--surface-2); font-weight: 600;
+    }
+    .btn:hover:not(:disabled) { border-color: var(--accent); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+    .btn-light { background: #ffffff; border-color: #ffffff; color: #151821; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .dock {
+      position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 20;
+      display: flex; gap: 4px; padding: 6px; border-radius: 999px;
+      background: color-mix(in srgb, var(--surface) 88%, transparent); backdrop-filter: blur(10px);
+      border: 1px solid var(--border); box-shadow: 0 8px 24px rgb(0 0 0 / 0.3);
+    }
+    body.idle .dock { opacity: 0; transform: translate(-50%, 12px); pointer-events: none; }
+    .icon-btn {
+      width: 44px; height: 44px; flex: none; display: inline-grid; place-items: center;
+      border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+    }
+    .icon-btn:hover:not(:disabled) { background: var(--surface-2); }
+    .icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+    .icon-btn[aria-expanded="true"] { background: var(--accent); color: #fff; }
+    .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .dock-sep { width: 1px; margin: 8px 2px; background: var(--border); }
+
+    .drawer {
+      position: fixed; top: 0; right: 0; z-index: 30; height: 100%; width: min(440px, 100%);
+      display: flex; flex-direction: column; background: var(--surface);
+      border-left: 1px solid var(--border); box-shadow: -16px 0 40px rgb(0 0 0 / 0.35);
+      transform: translateX(105%); transition: transform 0.28s ease; visibility: hidden;
+    }
+    .drawer.open { transform: none; visibility: visible; }
+    .drawer-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 14px 20px; border-bottom: 1px solid var(--border); }
+    .drawer-head h2 { margin: 0; font-size: 1.2rem; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 4px 20px 32px; }
+    .drawer section { padding: 18px 0; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+    .drawer section:last-child { border-bottom: 0; }
+    .drawer h3 { margin: 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    .field { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; font-weight: 600; }
+    .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .drawer input[type="text"], .drawer input[type="number"], .drawer select {
+      width: 100%; min-height: 44px; padding: 8px 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface-2); font-weight: 500;
+    }
+    .drawer input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 1px var(--danger); }
+    input[type="color"] { width: 44px; height: 44px; padding: 3px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; }
+    .rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    .row { display: grid; grid-template-columns: 44px 1fr 44px; gap: 8px; align-items: center; }
+    .row.point-row { grid-template-columns: 44px 1fr 84px 44px; }
+    .row-head { display: grid; grid-template-columns: 44px 1fr 84px 44px; gap: 8px; font-size: 0.78rem; color: var(--muted); }
+    .hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
+    .history { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+    .history li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+    .history .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25); }
+    .history time { margin-left: auto; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+    .history .empty { color: var(--muted); border: 0; }
+    .keys { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.9rem; }
+    .keys dt { font-weight: 700; }
+    .keys dd { margin: 0; color: var(--muted); }
+    kbd { padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px; font: inherit; font-size: 0.85em; }
+
+    .toast {
+      position: fixed; top: 16px; left: 50%; z-index: 40; width: max-content; max-width: min(560px, calc(100% - 32px)); text-align: center;
+      padding: 12px 18px; border-radius: 12px; background: var(--text); color: var(--bg); font-weight: 600;
+      transform: translate(-50%, calc(-100% - 24px)); visibility: hidden; transition: transform 0.3s ease, visibility 0.3s;
+    }
+    .toast.show { transform: translate(-50%, 0); visibility: visible; }
+
+    main, .dock { transition: padding 0.28s ease, left 0.28s ease, opacity 0.35s, transform 0.35s; }
+    @media (min-width: 1000px) {
+      body.drawer-open main { padding-right: calc(min(440px, 100%) + 16px); }
+      body.drawer-open .dock { left: calc((100% - 440px) / 2); }
+    }
+    @media (max-width: 480px) {
+      .field-pair { grid-template-columns: 1fr; }
+      .team { padding: 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+      .float { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <header id="header">
+    <h1 id="title">Scoreboard</h1>
+    <p class="subtitle" id="subtitle"></p>
+  </header>
+
+  <main>
+    <div class="result" id="result" role="status" hidden></div>
+    <div class="board" id="board"></div>
+  </main>
+
+  <nav class="dock" id="dock" aria-label="Scoreboard controls">
+    <button class="icon-btn" id="undoBtn" aria-label="Undo last score" title="Undo (Ctrl/⌘+Z)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+    </button>
+    <button class="icon-btn" id="redoBtn" aria-label="Redo" title="Redo (Ctrl/⌘+Shift+Z)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>
+    </button>
+    <span class="dock-sep" aria-hidden="true"></span>
+    <button class="icon-btn" id="fullscreenBtn" aria-label="Toggle full screen" title="Full screen (F)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" aria-label="Settings" aria-controls="drawer" aria-expanded="false" title="Settings (S)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+    </button>
+  </nav>
+
+  <aside class="drawer" id="drawer" aria-labelledby="drawerTitle" inert>
+    <div class="drawer-head">
+      <h2 id="drawerTitle">Settings</h2>
+      <button class="icon-btn" id="closeDrawer" aria-label="Close settings" title="Close (Esc)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+      <section>
+        <h3>Display</h3>
+        <label class="field">Title<input type="text" id="cfgTitle" maxlength="80" placeholder="Leave empty to hide"></label>
+        <label class="field">Subtitle<input type="text" id="cfgSubtitle" maxlength="120" placeholder="Optional, e.g. Round 2"></label>
+        <div class="field-pair">
+          <label class="field">Winning score<input type="number" id="cfgTarget" min="0" step="1" aria-describedby="targetHint"></label>
+          <label class="field">Theme<select id="cfgTheme"><option value="dark">Dark</option><option value="light">Light</option></select></label>
+        </div>
+        <p class="hint" id="targetHint">The game ends when a team reaches this score. Enter 0 to play with no limit.</p>
+      </section>
+
+      <section>
+        <h3>Teams</h3>
+        <ul class="rows" id="teamList"></ul>
+        <button class="btn" id="addTeam">+ Add team</button>
+      </section>
+
+      <section>
+        <h3>Point buttons</h3>
+        <div class="row-head" aria-hidden="true"><span>Colour</span><span>Label</span><span>Points</span><span></span></div>
+        <ul class="rows" id="pointList"></ul>
+        <p class="hint" id="pointHint">Points must be a whole number other than 0. Use a negative number for a penalty.</p>
+        <button class="btn" id="addPoint">+ Add point button</button>
+      </section>
+
+      <section>
+        <h3>Game</h3>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="declareBtn">End game and show winner</button>
+          <button class="btn" id="newGameBtn">New game</button>
+        </div>
+        <p class="hint">New game clears the scores and keeps your teams and point buttons.</p>
+        <div><button class="btn btn-danger" id="defaultsBtn">Restore default settings</button></div>
+      </section>
+
+      <section>
+        <h3>Score history <span id="histCount"></span></h3>
+        <ol class="history" id="history"></ol>
+      </section>
+
+      <section>
+        <h3>Keyboard shortcuts</h3>
+        <dl class="keys">
+          <dt><kbd>S</kbd></dt><dd>Show or hide settings</dd>
+          <dt><kbd>F</kbd></dt><dd>Full screen</dd>
+          <dt><kbd>Ctrl/⌘</kbd> + <kbd>Z</kbd></dt><dd>Undo last score</dd>
+          <dt><kbd>Ctrl/⌘</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd></dt><dd>Redo</dd>
+          <dt><kbd>Esc</kbd></dt><dd>Close settings</dd>
+        </dl>
+        <p class="hint">The control bar hides itself after a few seconds without mouse movement. Move the mouse or press any key to bring it back. Settings and scores are saved in this browser and stay in sync across open tabs.</p>
+      </section>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" role="alert"></div>
+  <div class="sr-only" id="announcer" aria-live="polite"></div>
+
+  <script>
+    const $ = s => document.querySelector(s);
+    const KEY = 'scoreboard:v1';
+    const HEX = /^#[0-9a-f]{6}$/i;
+    const MAX_TEAMS = 6;
+    const MAX_POINTS = 8;
+    const TEAM_COLOURS = ['#c62828', '#1565c0', '#2e7d32', '#f9a825', '#6a1b9a', '#ef6c00'];
+    const X_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    const uid = () => Math.random().toString(36).slice(2, 10);
+
+    function defaults() {
+      return {
+        cfg: {
+          title: 'Scoreboard', subtitle: '', target: 100, theme: 'dark',
+          teams: [
+            { id: uid(), name: 'Team Red', color: '#c62828' },
+            { id: uid(), name: 'Team Blue', color: '#1565c0' },
+          ],
+          points: [
+            { id: uid(), label: 'Red ball', value: 10, color: '#e53935' },
+            { id: uid(), label: 'White ball', value: 5, color: '#f4f4f4' },
+            { id: uid(), label: 'Gray ball', value: 3, color: '#8d8d8d' },
+          ],
+        },
+        log: [], redo: [], declared: false,
+      };
+    }
+
+    function isValid(d) {
+      const c = d && d.cfg;
+      const entry = e => e && typeof e.team === 'string' && Number.isInteger(e.value) && typeof e.at === 'number';
+      return !!c && typeof c.title === 'string' && typeof c.subtitle === 'string'
+        && Number.isInteger(c.target) && c.target >= 0 && ['dark', 'light'].includes(c.theme)
+        && Array.isArray(c.teams) && c.teams.length >= 2
+        && c.teams.every(t => t && typeof t.id === 'string' && typeof t.name === 'string' && HEX.test(t.color))
+        && Array.isArray(c.points) && c.points.length >= 1
+        && c.points.every(p => p && typeof p.id === 'string' && typeof p.label === 'string' && Number.isInteger(p.value) && p.value !== 0 && HEX.test(p.color))
+        && Array.isArray(d.log) && d.log.every(entry) && Array.isArray(d.redo) && d.redo.every(entry);
+    }
+
+    let loadProblem = '';
+    function load() {
+      let raw = null;
+      try { raw = localStorage.getItem(KEY); } catch {
+        loadProblem = "This browser is blocking storage, so scores will reset if the page reloads.";
+        return defaults();
+      }
+      if (raw === null) return defaults();
+      let d = null;
+      try { d = JSON.parse(raw); } catch { d = null; }
+      if (isValid(d)) return d;
+      loadProblem = "The saved scoreboard couldn't be read, so it started fresh with the default settings.";
+      return defaults();
+    }
+
+    let saveWarned = false;
+    function save() {
+      try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {
+        if (!saveWarned) { saveWarned = true; toast("Couldn't save to this browser, so scores will reset if the page reloads."); }
+      }
+    }
+
+    let S = load();
+
+    const team = id => S.cfg.teams.find(t => t.id === id);
+    const teamName = t => (t && t.name.trim()) || 'Untitled team';
+    const pointLabel = p => p.label.trim() || 'Points';
+    const signed = v => (v > 0 ? '+' : '−') + Math.abs(v);
+    const total = id => S.log.reduce((s, e) => (e.team === id ? s + e.value : s), 0);
+    const tally = (id, pt) => S.log.reduce((n, e) => (e.team === id && e.pt === pt ? n + 1 : n), 0);
+
+    function standing() {
+      const rows = S.cfg.teams.map(t => ({ team: t, score: total(t.id) }));
+      const max = Math.max(...rows.map(r => r.score));
+      const top = rows.filter(r => r.score === max);
+      const reached = S.cfg.target > 0 && max >= S.cfg.target;
+      return { rows, top, reached, ended: S.declared || reached };
+    }
+
+    function ink(hex) {
+      const l = [1, 3, 5]
+        .map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+        .map(c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+      return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2] > 0.179 ? '#111318' : '#ffffff';
+    }
+
+    function h(tag, attrs = {}, ...kids) {
+      const el = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (v === false || v == null) continue;
+        if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+        else el.setAttribute(k, v === true ? '' : v);
+      }
+      el.append(...kids.flat().filter(k => k != null && k !== false));
+      return el;
+    }
+
+    function commit() { save(); render(); }
+
+    function addScore(teamId, ptId) {
+      if (standing().ended) return;
+      const p = S.cfg.points.find(x => x.id === ptId);
+      const t = team(teamId);
+      if (!p || !t) return;
+      S.log.push({ team: teamId, pt: p.id, label: pointLabel(p), value: p.value, at: Date.now() });
+      S.redo = [];
+      commit();
+      floatFeedback(`${teamId}:${ptId}:add`, signed(p.value));
+      announce(`${teamName(t)} ${signed(p.value)}, ${pointLabel(p)}. Total ${total(teamId)}.`);
+    }
+
+    function removeScore(teamId, ptId) {
+      for (let i = S.log.length - 1; i >= 0; i--) {
+        const e = S.log[i];
+        if (e.team === teamId && e.pt === ptId) {
+          S.log.splice(i, 1);
+          S.redo = [];
+          commit();
+          announce(`Removed ${e.label} from ${teamName(team(teamId))}. Total ${total(teamId)}.`);
+          return;
+        }
+      }
+    }
+
+    function undo() {
+      const e = S.log.pop();
+      if (!e) return;
+      S.redo.push(e);
+      commit();
+      announce(`Undid ${signed(e.value)} for ${teamName(team(e.team))}.`);
+    }
+
+    function redo() {
+      const e = S.redo.pop();
+      if (!e) return;
+      S.log.push(e);
+      commit();
+      announce(`Redid ${signed(e.value)} for ${teamName(team(e.team))}.`);
+    }
+
+    let lastTotals = {};
+    function render() {
+      const st = standing();
+      const c = S.cfg;
+      document.documentElement.dataset.theme = c.theme;
+      document.title = c.title.trim() || 'Scoreboard';
+      $('#title').textContent = c.title;
+      $('#title').hidden = !c.title.trim();
+      $('#subtitle').textContent = c.subtitle;
+      $('#header').hidden = !c.title.trim() && !c.subtitle.trim();
+
+      const focusKey = document.activeElement && document.activeElement.dataset.key;
+      $('#board').replaceChildren(...c.teams.map(t => teamCard(t, st)));
+      if (focusKey) {
+        const again = $('#board').querySelector(`[data-key="${focusKey}"]`);
+        if (again) again.focus();
+      }
+      lastTotals = Object.fromEntries(st.rows.map(r => [r.team.id, r.score]));
+
+      renderResult(st);
+      renderHistory();
+      $('#undoBtn').disabled = S.log.length === 0;
+      $('#redoBtn').disabled = S.redo.length === 0;
+      $('#declareBtn').textContent = S.declared ? 'Resume scoring' : 'End game and show winner';
+      $('#declareBtn').disabled = st.reached;
+      $('#addTeam').disabled = c.teams.length >= MAX_TEAMS;
+      $('#addPoint').disabled = c.points.length >= MAX_POINTS;
+    }
+
+    function teamCard(t, st) {
+      const score = total(t.id);
+      const target = S.cfg.target;
+      const soleLeader = st.top.length === 1 && st.top[0].team === t;
+      const isTop = st.top.some(r => r.team === t);
+      const chip = st.ended
+        ? (soleLeader ? 'Winner' : isTop ? 'Tied' : null)
+        : (soleLeader && S.log.length ? 'Leading' : null);
+      const changed = t.id in lastTotals && lastTotals[t.id] !== score;
+      const name = teamName(t);
+
+      return h('section', {
+        class: `team${st.ended && soleLeader ? ' win' : ''}${st.ended && !isTop ? ' dim' : ''}`,
+        style: `--team:${t.color};--ink:${ink(t.color)}`,
+        'aria-label': `${name}: ${score} points`,
+      },
+        h('div', { class: 'team-top' },
+          h('h2', { class: 'team-name' }, name),
+          chip && h('span', { class: 'chip' }, chip)),
+        h('div', { class: `score${changed ? ' bump' : ''}`, 'aria-hidden': 'true' }, String(score)),
+        target > 0 && h('div', {
+          class: 'progress', role: 'progressbar', 'aria-label': `${name} progress to ${target}`,
+          'aria-valuemin': 0, 'aria-valuemax': target, 'aria-valuenow': Math.max(0, Math.min(score, target)),
+        }, h('span', { style: `width:${Math.max(0, Math.min(100, (score / target) * 100))}%` })),
+        target > 0 && !st.ended && h('p', { class: 'to-go' }, score >= target ? 'Target reached' : `${target - score} to win`),
+        h('div', { class: 'points' }, S.cfg.points.map(p => pointButton(t, p, st.ended))),
+      );
+    }
+
+    function pointButton(t, p, ended) {
+      const count = tally(t.id, p.id);
+      const label = pointLabel(p);
+      return h('div', { class: 'pt', style: `--pt:${p.color}` },
+        h('button', {
+          class: 'pt-add', 'data-key': `${t.id}:${p.id}:add`, disabled: ended,
+          'aria-label': `${signed(p.value)} ${label} for ${teamName(t)}. Scored ${count} times.`,
+          onclick: () => addScore(t.id, p.id),
+        },
+          h('span', { class: 'swatch', 'aria-hidden': 'true' },
+            count > 0 && h('span', { class: 'pt-count', title: 'Times scored' }, String(count))),
+          h('span', { class: 'pt-text', 'aria-hidden': 'true' },
+            h('span', { class: 'pt-value' }, signed(p.value)),
+            h('span', { class: 'pt-label' }, label))),
+        h('button', {
+          class: 'pt-sub', 'data-key': `${t.id}:${p.id}:sub`, disabled: count === 0,
+          'aria-label': `Remove one ${label} from ${teamName(t)}`, title: 'Remove one',
+          onclick: () => removeScore(t.id, p.id),
+        }, '−'));
+    }
+
+    function floatFeedback(key, text) {
+      const btn = $('#board').querySelector(`[data-key="${key}"]`);
+      if (!btn) return;
+      const f = h('span', { class: 'float', 'aria-hidden': 'true' }, text);
+      f.addEventListener('animationend', () => f.remove());
+      btn.append(f);
+    }
+
+    function renderResult(st) {
+      const box = $('#result');
+      if (!st.ended) { box.hidden = true; box.replaceChildren(); return; }
+      const single = st.top.length === 1 ? st.top[0].team : null;
+      const heading = single
+        ? `${teamName(single)} wins!`
+        : `It's a tie between ${st.top.map(r => teamName(r.team)).join(' and ')}`;
+      const detail = st.reached
+        ? `Reached the ${S.cfg.target}-point target. Undo or remove a score to keep playing.`
+        : 'Game ended by the scorekeeper.';
+      box.style.setProperty('--res', single ? single.color : '');
+      box.style.setProperty('--res-ink', single ? ink(single.color) : '');
+      box.replaceChildren(
+        h('div', {}, h('h2', {}, heading), h('p', {}, detail)),
+        h('div', { class: 'btn-row' },
+          S.declared && !st.reached && h('button', { class: 'btn btn-light', onclick: () => { S.declared = false; commit(); } }, 'Resume scoring'),
+          st.reached && h('button', { class: 'btn btn-light', onclick: undo }, 'Undo last score'),
+          h('button', { class: 'btn btn-light', onclick: newGame }, 'New game')),
+      );
+      box.hidden = false;
+    }
+
+    function renderHistory() {
+      const list = $('#history');
+      $('#histCount').textContent = S.log.length ? `(${S.log.length})` : '';
+      if (!S.log.length) {
+        list.replaceChildren(h('li', { class: 'empty' }, 'No points scored yet. Each score shows up here, newest first.'));
+        return;
+      }
+      list.replaceChildren(...S.log.slice().reverse().map(e => {
+        const t = team(e.team);
+        return h('li', {},
+          h('span', { class: 'dot', style: `background:${t ? t.color : '#888'}`, 'aria-hidden': 'true' }),
+          h('span', {}, h('strong', {}, teamName(t)), ` ${signed(e.value)} · ${e.label}`),
+          h('time', { datetime: new Date(e.at).toISOString() },
+            new Date(e.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })));
+      }));
+    }
+
+    function intInput(input, ok, current, apply) {
+      input.addEventListener('input', () => {
+        const v = Number(input.value);
+        const good = input.value.trim() !== '' && Number.isInteger(v) && ok(v);
+        input.setAttribute('aria-invalid', String(!good));
+        if (good) { apply(v); commit(); }
+      });
+      input.addEventListener('change', () => {
+        if (input.getAttribute('aria-invalid') === 'true') {
+          input.value = current();
+          input.setAttribute('aria-invalid', 'false');
+          toast('That value was not saved. Enter a whole number.');
+        }
+      });
+    }
+
+    function renderConfig() {
+      const c = S.cfg;
+      $('#cfgTitle').value = c.title;
+      $('#cfgSubtitle').value = c.subtitle;
+      $('#cfgTarget').value = c.target;
+      $('#cfgTarget').setAttribute('aria-invalid', 'false');
+      $('#cfgTheme').value = c.theme;
+
+      $('#teamList').replaceChildren(...c.teams.map((t, i) => {
+        const nameIn = h('input', { type: 'text', value: t.name, maxlength: 40, 'aria-label': `Team ${i + 1} name`, oninput: e => { t.name = e.target.value; commit(); } });
+        const del = h('button', { class: 'icon-btn', 'aria-label': `Remove team ${i + 1}`, title: 'Remove team', disabled: c.teams.length <= 2, onclick: () => removeTeam(t.id) });
+        del.innerHTML = X_ICON;
+        return h('li', { class: 'row' },
+          h('input', { type: 'color', value: t.color, 'aria-label': `Team ${i + 1} colour`, oninput: e => { t.color = e.target.value; commit(); } }),
+          nameIn, del);
+      }));
+
+      $('#pointList').replaceChildren(...c.points.map((p, i) => {
+        const valueIn = h('input', { type: 'number', step: 1, value: p.value, 'aria-label': `Point button ${i + 1} value`, 'aria-describedby': 'pointHint' });
+        intInput(valueIn, v => v !== 0, () => p.value, v => { p.value = v; });
+        const del = h('button', { class: 'icon-btn', 'aria-label': `Remove point button ${i + 1}`, title: 'Remove point button', disabled: c.points.length <= 1, onclick: () => removePoint(p.id) });
+        del.innerHTML = X_ICON;
+        return h('li', { class: 'row point-row' },
+          h('input', { type: 'color', value: p.color, 'aria-label': `Point button ${i + 1} colour`, oninput: e => { p.color = e.target.value; commit(); } }),
+          h('input', { type: 'text', value: p.label, maxlength: 30, 'aria-label': `Point button ${i + 1} label`, oninput: e => { p.label = e.target.value; commit(); } }),
+          valueIn, del);
+      }));
+    }
+
+    function addTeam() {
+      if (S.cfg.teams.length >= MAX_TEAMS) return;
+      const used = new Set(S.cfg.teams.map(t => t.color.toLowerCase()));
+      const color = TEAM_COLOURS.find(x => !used.has(x)) || '#607d8b';
+      S.cfg.teams.push({ id: uid(), name: `Team ${S.cfg.teams.length + 1}`, color });
+      commit(); renderConfig();
+      $('#teamList').lastElementChild.querySelector('input[type="text"]').select();
+    }
+
+    function removeTeam(id) {
+      if (S.cfg.teams.length <= 2) return;
+      const t = team(id);
+      const scored = S.log.filter(e => e.team === id).length;
+      if (scored && !confirm(`Remove ${teamName(t)}? Its ${total(id)} points from ${scored} scores will be deleted. This can't be undone.`)) return;
+      S.cfg.teams = S.cfg.teams.filter(x => x.id !== id);
+      S.log = S.log.filter(e => e.team !== id);
+      S.redo = S.redo.filter(e => e.team !== id);
+      commit(); renderConfig();
+      toast(`Removed ${teamName(t)}.`);
+    }
+
+    function addPoint() {
+      if (S.cfg.points.length >= MAX_POINTS) return;
+      S.cfg.points.push({ id: uid(), label: 'New points', value: 1, color: '#6b97ff' });
+      commit(); renderConfig();
+      $('#pointList').lastElementChild.querySelector('input[type="text"]').select();
+    }
+
+    function removePoint(id) {
+      if (S.cfg.points.length <= 1) return;
+      const p = S.cfg.points.find(x => x.id === id);
+      S.cfg.points = S.cfg.points.filter(x => x.id !== id);
+      commit(); renderConfig();
+      toast(`Removed the ${pointLabel(p)} button. Points already scored with it stay on the board.`);
+    }
+
+    function newGame() {
+      if (S.log.length && !confirm('Start a new game? All scores and history will be cleared. Teams and point buttons stay.')) return;
+      S.log = []; S.redo = []; S.declared = false; lastTotals = {};
+      commit();
+      toast('New game started.');
+    }
+
+    function restoreDefaults() {
+      if (!confirm('Restore default settings? Title, teams, colours, point buttons and all scores go back to the defaults.')) return;
+      S = defaults(); lastTotals = {};
+      commit(); renderConfig();
+      toast('Default settings restored.');
+    }
+
+    const drawer = $('#drawer');
+    const settingsBtn = $('#settingsBtn');
+    const drawerOpen = () => drawer.classList.contains('open');
+    function setDrawer(open) {
+      drawer.classList.toggle('open', open);
+      document.body.classList.toggle('drawer-open', open);
+      drawer.inert = !open;
+      settingsBtn.setAttribute('aria-expanded', String(open));
+      if (open) { renderConfig(); $('#cfgTitle').focus(); wake(); }
+      else if (drawer.contains(document.activeElement)) settingsBtn.focus();
+    }
+
+    async function toggleFullscreen() {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+      } catch {
+        toast("Full screen isn't available here. Use your browser's full-screen key (F11 or Ctrl+⌘+F).");
+      }
+    }
+
+    function toast(msg) {
+      const t = $('#toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => t.classList.remove('show'), 4000);
+    }
+
+    function announce(msg) { $('#announcer').textContent = msg; }
+
+    let idleTimer;
+    function wake() {
+      document.body.classList.remove('idle');
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (!drawerOpen() && !$('#dock').contains(document.activeElement)) document.body.classList.add('idle');
+      }, 3500);
+    }
+
+    $('#undoBtn').addEventListener('click', undo);
+    $('#redoBtn').addEventListener('click', redo);
+    $('#fullscreenBtn').addEventListener('click', toggleFullscreen);
+    settingsBtn.addEventListener('click', () => setDrawer(!drawerOpen()));
+    $('#closeDrawer').addEventListener('click', () => setDrawer(false));
+    $('#addTeam').addEventListener('click', addTeam);
+    $('#addPoint').addEventListener('click', addPoint);
+    $('#newGameBtn').addEventListener('click', newGame);
+    $('#defaultsBtn').addEventListener('click', restoreDefaults);
+    $('#declareBtn').addEventListener('click', () => { S.declared = !S.declared; commit(); });
+    $('#cfgTitle').addEventListener('input', e => { S.cfg.title = e.target.value; commit(); });
+    $('#cfgSubtitle').addEventListener('input', e => { S.cfg.subtitle = e.target.value; commit(); });
+    $('#cfgTheme').addEventListener('change', e => { S.cfg.theme = e.target.value; commit(); });
+    intInput($('#cfgTarget'), v => v >= 0, () => S.cfg.target, v => { S.cfg.target = v; });
+
+    ['pointermove', 'pointerdown', 'keydown'].forEach(ev => addEventListener(ev, wake, { passive: true }));
+
+    addEventListener('keydown', e => {
+      if (e.key === 'Escape' && drawerOpen()) { setDrawer(false); return; }
+      if (e.target.closest && e.target.closest('input, select, textarea')) return;
+      const mod = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+      if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+      else if (mod && k === 'y') { e.preventDefault(); redo(); }
+      else if (!mod && !e.altKey && k === 's') { e.preventDefault(); setDrawer(!drawerOpen()); }
+      else if (!mod && !e.altKey && k === 'f') { e.preventDefault(); toggleFullscreen(); }
+    });
+
+    addEventListener('storage', e => {
+      if (e.key !== KEY) return;
+      S = load();
+      render();
+      if (drawerOpen() && !drawer.contains(document.activeElement)) renderConfig();
+    });
+
+    render();
+    wake();
+    if (loadProblem) toast(loadProblem);
+  </script>
+</body>
+</html>

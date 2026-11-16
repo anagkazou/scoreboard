@@ -89,6 +89,35 @@
     }
     @keyframes float { from { opacity: 1; transform: translate(-50%, 6px) scale(0.9); } to { opacity: 0; transform: translate(-50%, -34px) scale(1.15); } }
 
+    .timer {
+      position: relative; overflow: hidden; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+      padding: 8px 8px 12px 14px; border-radius: 14px; background: color-mix(in srgb, var(--ink) 14%, transparent);
+    }
+    .timer-time {
+      flex: 1 1 auto; min-width: 3ch; height: clamp(1.5rem, 9cqi, 4.5rem); display: flex; align-items: center;
+      font-size: clamp(1.5rem, 9cqi, 4.5rem); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap;
+    }
+    @container (max-width: 560px) {
+      .timer-time { flex-basis: 100%; }
+      .timer-presets { flex: 1; margin-left: 0; }
+      .timer-btn { flex: 1; }
+    }
+    .timer:not(.running):not(.expired) .timer-time { font-size: 1rem; font-weight: 700; opacity: 0.85; }
+    .timer-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+    .timer-btn, .timer-stop {
+      min-width: 48px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 10px; cursor: pointer;
+      background: #ffffff; color: #151821; font-weight: 800; font-variant-numeric: tabular-nums; box-shadow: 0 3px 0 rgb(0 0 0 / 0.25);
+    }
+    .timer-btn:hover, .timer-stop:hover { background: #f2f4f8; }
+    .timer-btn:active, .timer-stop:active { transform: translateY(2px); }
+    .timer-stop { flex: none; width: 4.6em; }
+    .timer-stop[hidden] { display: inline-block; visibility: hidden; }
+    .timer-bar { position: absolute; left: 0; bottom: 0; width: 100%; height: 4px; background: var(--ink); transform: scaleX(0); transform-origin: left; transition: transform 0.1s linear; }
+    .timer.warn .timer-time { animation: pulse 1s ease-in-out infinite; }
+    .timer.expired { background: var(--ink); color: var(--team); animation: flash 0.5s steps(1) 6; }
+    @keyframes pulse { 50% { transform: scale(1.15); } }
+    @keyframes flash { 50% { background: color-mix(in srgb, var(--ink) 14%, transparent); color: var(--ink); } }
+
     .result {
       display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px;
       padding: 18px 22px; border-radius: var(--radius);
@@ -156,6 +185,9 @@
     .row.point-row { grid-template-columns: 44px 1fr 84px 44px; }
     .row-head { display: grid; grid-template-columns: 44px 1fr 84px 44px; gap: 8px; font-size: 0.78rem; color: var(--muted); }
     .hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
+    .row.timer-row { grid-template-columns: 1fr 44px; }
+    .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 0.9rem; font-weight: 600; cursor: pointer; }
+    .check input { width: 20px; height: 20px; accent-color: var(--accent); }
     .history { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
     .history li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
     .history .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25); }
@@ -264,6 +296,14 @@
       </section>
 
       <section>
+        <h3>Timers</h3>
+        <ul class="rows" id="timerList"></ul>
+        <p class="hint" id="timerHint">Each team gets a button for every timer. Enter seconds from 1 to 3600. Remove them all to hide timers.</p>
+        <button class="btn" id="addTimer">+ Add timer</button>
+        <label class="check"><input type="checkbox" id="cfgSound"> Play a sound when time is up</label>
+      </section>
+
+      <section>
         <h3>Game</h3>
         <div class="btn-row">
           <button class="btn btn-primary" id="declareBtn">End game and show winner</button>
@@ -301,6 +341,9 @@
     const HEX = /^#[0-9a-f]{6}$/i;
     const MAX_TEAMS = 6;
     const MAX_POINTS = 8;
+    const MAX_TIMERS = 6;
+    const MAX_SECONDS = 3600;
+    const DEFAULT_TIMERS = [5, 10, 15];
     const TEAM_COLOURS = ['#c62828', '#1565c0', '#2e7d32', '#f9a825', '#6a1b9a', '#ef6c00'];
     const X_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
     const uid = () => Math.random().toString(36).slice(2, 10);
@@ -318,8 +361,9 @@
             { id: uid(), label: 'White ball', value: 5, color: '#f4f4f4' },
             { id: uid(), label: 'Gray ball', value: 3, color: '#8d8d8d' },
           ],
+          timers: [...DEFAULT_TIMERS], sound: true,
         },
-        log: [], redo: [], declared: false,
+        log: [], redo: [], declared: false, timers: {},
       };
     }
 
@@ -332,7 +376,19 @@
         && c.teams.every(t => t && typeof t.id === 'string' && typeof t.name === 'string' && HEX.test(t.color))
         && Array.isArray(c.points) && c.points.length >= 1
         && c.points.every(p => p && typeof p.id === 'string' && typeof p.label === 'string' && Number.isInteger(p.value) && p.value !== 0 && HEX.test(p.color))
-        && Array.isArray(d.log) && d.log.every(entry) && Array.isArray(d.redo) && d.redo.every(entry);
+        && Array.isArray(c.timers) && c.timers.length <= MAX_TIMERS && c.timers.every(s => Number.isInteger(s) && s >= 1 && s <= MAX_SECONDS)
+        && typeof c.sound === 'boolean'
+        && Array.isArray(d.log) && d.log.every(entry) && Array.isArray(d.redo) && d.redo.every(entry)
+        && !!d.timers && typeof d.timers === 'object' && !Array.isArray(d.timers)
+        && Object.values(d.timers).every(x => x && typeof x.end === 'number' && Number.isInteger(x.dur) && x.dur > 0);
+    }
+
+    function upgrade(d) {
+      if (!d || typeof d !== 'object' || !d.cfg || typeof d.cfg !== 'object') return d;
+      if (!('timers' in d.cfg)) d.cfg.timers = [...DEFAULT_TIMERS];
+      if (!('sound' in d.cfg)) d.cfg.sound = true;
+      if (!('timers' in d)) d.timers = {};
+      return d;
     }
 
     let loadProblem = '';
@@ -344,7 +400,7 @@
       }
       if (raw === null) return defaults();
       let d = null;
-      try { d = JSON.parse(raw); } catch { d = null; }
+      try { d = upgrade(JSON.parse(raw)); } catch { d = null; }
       if (isValid(d)) return d;
       loadProblem = "The saved scoreboard couldn't be read, so it started fresh with the default settings.";
       return defaults();
@@ -462,6 +518,8 @@
       $('#declareBtn').disabled = st.reached;
       $('#addTeam').disabled = c.teams.length >= MAX_TEAMS;
       $('#addPoint').disabled = c.points.length >= MAX_POINTS;
+      $('#addTimer').disabled = c.timers.length >= MAX_TIMERS;
+      runTimers();
     }
 
     function teamCard(t, st) {
@@ -489,6 +547,7 @@
           'aria-valuemin': 0, 'aria-valuemax': target, 'aria-valuenow': Math.max(0, Math.min(score, target)),
         }, h('span', { style: `width:${Math.max(0, Math.min(100, (score / target) * 100))}%` })),
         target > 0 && !st.ended && h('p', { class: 'to-go' }, score >= target ? 'Target reached' : `${target - score} to win`),
+        S.cfg.timers.length > 0 && timerBox(t),
         h('div', { class: 'points' }, S.cfg.points.map(p => pointButton(t, p, st.ended))),
       );
     }
@@ -512,6 +571,100 @@
           'aria-label': `Remove one ${label} from ${teamName(t)}`, title: 'Remove one',
           onclick: () => removeScore(t.id, p.id),
         }, '−'));
+    }
+
+    const preset = s => (s < 60 ? `${s}s` : s % 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s / 60}m`);
+    function clock(ms) {
+      const s = Math.ceil(ms / 1000);
+      return s < 60 ? String(s) : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }
+
+    function timerBox(t) {
+      const name = teamName(t);
+      const box = h('div', { class: 'timer', 'data-timer': t.id, role: 'group', 'aria-label': `${name} timer` },
+        h('span', { class: 'timer-time', role: 'timer' }),
+        h('div', { class: 'timer-presets' }, S.cfg.timers.map((s, i) => h('button', {
+          class: 'timer-btn', 'data-key': `${t.id}:timer:${i}`,
+          'aria-label': `Start a ${preset(s)} timer for ${name}`, onclick: () => startTimer(t.id, s),
+        }, preset(s)))),
+        h('button', { class: 'timer-stop', 'data-key': `${t.id}:timer:stop`, onclick: () => stopTimer(t.id) }),
+        h('span', { class: 'timer-bar', 'aria-hidden': 'true' }));
+      paintTimer(box, t, Date.now());
+      return box;
+    }
+
+    function paintTimer(box, t, now) {
+      const tm = S.timers[t.id];
+      const left = tm ? tm.end - now : 0;
+      const running = !!tm && left > 0;
+      const expired = !!tm && !running;
+      box.classList.toggle('running', running);
+      box.classList.toggle('warn', running && left <= 3000);
+      box.classList.toggle('expired', expired);
+      box.querySelector('.timer-time').textContent = running ? clock(left) : expired ? "Time's up!" : 'Timer';
+      box.querySelector('.timer-bar').style.transform = `scaleX(${running ? left / (tm.dur * 1000) : 0})`;
+      const stop = box.querySelector('.timer-stop');
+      stop.hidden = !tm;
+      stop.textContent = running ? 'Stop' : 'Reset';
+      stop.setAttribute('aria-label', `${running ? 'Stop' : 'Reset'} the ${teamName(t)} timer`);
+    }
+
+    const sound = { ctx: null };
+    function unlockSound() {
+      if (!S.cfg.sound || !window.AudioContext) return;
+      if (!sound.ctx) sound.ctx = new AudioContext();
+      if (sound.ctx.state === 'suspended') sound.ctx.resume().catch(() => { sound.ctx = null; });
+    }
+    function beep() {
+      const c = sound.ctx;
+      if (!S.cfg.sound || !c || c.state !== 'running') return;
+      [0, 0.22, 0.44].forEach((at, i) => {
+        const o = c.createOscillator();
+        const g = c.createGain();
+        const start = c.currentTime + at;
+        const len = i === 2 ? 0.5 : 0.16;
+        o.frequency.value = i === 2 ? 1046 : 880;
+        g.gain.setValueAtTime(0.3, start);
+        g.gain.exponentialRampToValueAtTime(0.001, start + len);
+        o.connect(g).connect(c.destination);
+        o.start(start);
+        o.stop(start + len);
+      });
+    }
+
+    function startTimer(teamId, seconds) {
+      unlockSound();
+      S.timers[teamId] = { end: Date.now() + seconds * 1000, dur: seconds };
+      commit();
+      announce(`${preset(seconds)} timer started for ${teamName(team(teamId))}.`);
+    }
+
+    function stopTimer(teamId) {
+      delete S.timers[teamId];
+      commit();
+      announce(`${teamName(team(teamId))} timer cleared.`);
+    }
+
+    const rung = {};
+    let ticker = 0;
+    function tick() {
+      const now = Date.now();
+      let live = false;
+      for (const t of S.cfg.teams) {
+        const tm = S.timers[t.id];
+        const box = $('#board').querySelector(`[data-timer="${t.id}"]`);
+        if (!tm || !box) continue;
+        paintTimer(box, t, now);
+        if (tm.end > now) { live = true; continue; }
+        if (rung[t.id] === tm.end) continue;
+        rung[t.id] = tm.end;
+        if (now - tm.end < 2000) { beep(); announce(`Time's up for ${teamName(t)}.`); }
+      }
+      if (!live) { clearInterval(ticker); ticker = 0; }
+    }
+    function runTimers() {
+      if (!ticker && Object.keys(S.timers).length) ticker = setInterval(tick, 100);
+      tick();
     }
 
     function floatFeedback(key, text) {
@@ -561,7 +714,7 @@
       }));
     }
 
-    function intInput(input, ok, current, apply) {
+    function intInput(input, ok, current, apply, fix = 'Enter a whole number.') {
       input.addEventListener('input', () => {
         const v = Number(input.value);
         const good = input.value.trim() !== '' && Number.isInteger(v) && ok(v);
@@ -572,7 +725,7 @@
         if (input.getAttribute('aria-invalid') === 'true') {
           input.value = current();
           input.setAttribute('aria-invalid', 'false');
-          toast('That value was not saved. Enter a whole number.');
+          toast(`That value was not saved. ${fix}`);
         }
       });
     }
@@ -604,6 +757,31 @@
           h('input', { type: 'text', value: p.label, maxlength: 30, 'aria-label': `Point button ${i + 1} label`, oninput: e => { p.label = e.target.value; commit(); } }),
           valueIn, del);
       }));
+
+      $('#timerList').replaceChildren(...c.timers.map((s, i) => {
+        const secs = h('input', { type: 'number', min: 1, max: MAX_SECONDS, step: 1, value: s, 'aria-label': `Timer ${i + 1} seconds`, 'aria-describedby': 'timerHint' });
+        intInput(secs, v => v >= 1 && v <= MAX_SECONDS, () => c.timers[i], v => { c.timers[i] = v; }, `Enter seconds from 1 to ${MAX_SECONDS}.`);
+        const del = h('button', { class: 'icon-btn', 'aria-label': `Remove timer ${i + 1}`, title: 'Remove timer', onclick: () => removeTimer(i) });
+        del.innerHTML = X_ICON;
+        return h('li', { class: 'row timer-row' }, secs, del);
+      }));
+      $('#cfgSound').checked = c.sound;
+    }
+
+    function addTimer() {
+      const c = S.cfg;
+      if (c.timers.length >= MAX_TIMERS) return;
+      c.timers.push(Math.min(MAX_SECONDS, (c.timers[c.timers.length - 1] || 0) + 5));
+      commit(); renderConfig();
+      $('#timerList').lastElementChild.querySelector('input').select();
+    }
+
+    function removeTimer(i) {
+      const s = S.cfg.timers[i];
+      S.cfg.timers.splice(i, 1);
+      if (!S.cfg.timers.length) S.timers = {};
+      commit(); renderConfig();
+      toast(S.cfg.timers.length ? `Removed the ${preset(s)} timer.` : 'Removed the last timer, so timers are hidden. Add one to bring them back.');
     }
 
     function addTeam() {
@@ -623,6 +801,7 @@
       S.cfg.teams = S.cfg.teams.filter(x => x.id !== id);
       S.log = S.log.filter(e => e.team !== id);
       S.redo = S.redo.filter(e => e.team !== id);
+      delete S.timers[id];
       commit(); renderConfig();
       toast(`Removed ${teamName(t)}.`);
     }
@@ -644,7 +823,7 @@
 
     function newGame() {
       if (S.log.length && !confirm('Start a new game? All scores and history will be cleared. Teams and point buttons stay.')) return;
-      S.log = []; S.redo = []; S.declared = false; lastTotals = {};
+      S.log = []; S.redo = []; S.declared = false; S.timers = {}; lastTotals = {};
       commit();
       toast('New game started.');
     }
@@ -703,6 +882,8 @@
     $('#closeDrawer').addEventListener('click', () => setDrawer(false));
     $('#addTeam').addEventListener('click', addTeam);
     $('#addPoint').addEventListener('click', addPoint);
+    $('#addTimer').addEventListener('click', addTimer);
+    $('#cfgSound').addEventListener('change', e => { S.cfg.sound = e.target.checked; commit(); });
     $('#newGameBtn').addEventListener('click', newGame);
     $('#defaultsBtn').addEventListener('click', restoreDefaults);
     $('#declareBtn').addEventListener('click', () => { S.declared = !S.declared; commit(); });

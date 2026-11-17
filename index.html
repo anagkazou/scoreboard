@@ -343,7 +343,7 @@
     const MAX_POINTS = 8;
     const MAX_TIMERS = 6;
     const MAX_SECONDS = 3600;
-    const DEFAULT_TIMERS = [5, 10, 15];
+    const DEFAULT_TIMERS = [5, 10, 15, 30];
     const TEAM_COLOURS = ['#c62828', '#1565c0', '#2e7d32', '#f9a825', '#6a1b9a', '#ef6c00'];
     const X_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
     const uid = () => Math.random().toString(36).slice(2, 10);
@@ -385,7 +385,7 @@
 
     function upgrade(d) {
       if (!d || typeof d !== 'object' || !d.cfg || typeof d.cfg !== 'object') return d;
-      if (!('timers' in d.cfg)) d.cfg.timers = [...DEFAULT_TIMERS];
+      if (!('timers' in d.cfg) || JSON.stringify(d.cfg.timers) === '[5,10,15]') d.cfg.timers = [...DEFAULT_TIMERS];
       if (!('sound' in d.cfg)) d.cfg.sound = true;
       if (!('timers' in d)) d.timers = {};
       return d;
